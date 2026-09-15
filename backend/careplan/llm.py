@@ -6,9 +6,16 @@ PROMPT_TEMPLATE = """You are a clinical pharmacist. Write a Care Plan for the fo
 Patient name: {patient_name}
 Patient DOB: {patient_dob}
 Patient MRN: {mrn}
+Weight: {weight}
+Allergies: {allergies}
+Primary Diagnosis: {primary_diagnosis}
 Medication: {drug_name}
+Home meds: {home_meds}
 Prescriber: {provider_name}
 Prescriber NPI: {npi}
+
+Patient Records:
+{patient_records}
 
 Write the Care Plan with exactly these four sections, each with a clear heading:
 1. Problem List
