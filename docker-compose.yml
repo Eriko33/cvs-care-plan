@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: careplan
       POSTGRES_USER: careplan
@@ -10,7 +10,7 @@ services:
 
   web:
     build: ./backend
-    command: sh -c "python manage.py makemigrations careplan && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "python manage.py makemigrations careplan rag && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
     ports:
