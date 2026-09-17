@@ -21,7 +21,12 @@ def index(request):
             "provider_name": request.POST.get("provider_name", ""),
             "npi": request.POST.get("npi", ""),
         }
-        content, prompt_version = generate_care_plan(data)
-        care_plan = CarePlan.objects.create(content=content, prompt_version=prompt_version, **data)
+        content, prompt_version, reference_material = generate_care_plan(data)
+        care_plan = CarePlan.objects.create(
+            content=content,
+            prompt_version=prompt_version,
+            reference_material=reference_material,
+            **data,
+        )
 
     return render(request, "careplan/index.html", {"care_plan": care_plan})

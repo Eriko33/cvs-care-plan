@@ -1,4 +1,4 @@
 # Maps a prompt name to the version file (under prompts/<name>/<version>.txt)
 # that is used when no explicit version is requested.
 active_versions:
-  care_plan: v1
+  care_plan: v2  # v2 = grounded on retrieved reference material; v1 = no RAG, for comparison

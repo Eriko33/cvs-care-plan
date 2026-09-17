@@ -56,6 +56,11 @@
   {% if care_plan %}
   <h2>Generated Care Plan <small>(prompt version: {{ care_plan.prompt_version }})</small></h2>
   <pre>{{ care_plan.content }}</pre>
+
+  <details>
+    <summary>Reference material used for this generation</summary>
+    <pre>{{ care_plan.reference_material }}</pre>
+  </details>
   {% endif %}
 </body>
 </html>

@@ -15,6 +15,7 @@ class CarePlan(models.Model):
     npi = models.CharField(max_length=50)
     content = models.TextField()
     prompt_version = models.CharField(max_length=50, blank=True)
+    reference_material = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

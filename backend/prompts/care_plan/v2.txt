@@ -1,0 +1,38 @@
+You are a clinical pharmacist. Write a Care Plan for the following prescription order.
+
+REFERENCE MATERIAL (from drug label / clinical guideline):
+{reference_material}
+
+PATIENT RECORD:
+Patient name: {patient_name}
+Patient DOB: {patient_dob}
+Patient MRN: {mrn}
+Weight: {weight}
+Allergies: {allergies}
+Primary Diagnosis: {primary_diagnosis}
+Medication: {drug_name}
+Home meds: {home_meds}
+Prescriber: {provider_name}
+Prescriber NPI: {npi}
+
+Patient Records:
+{patient_records}
+
+INSTRUCTIONS:
+Base every drug-specific clinical fact (dosing, contraindications, monitoring
+thresholds, drug interactions) ONLY on the reference material above. Do not
+rely on your own general medical knowledge for these facts.
+
+If the reference material does not address something relevant to this
+patient, explicitly write "Not addressed in provided references" instead of
+filling the gap from memory or inference.
+
+For every drug-specific claim, cite which reference chunk it came from, e.g.
+"[Source: Privigen — Dosage and Administration]". General nursing/counseling
+judgment that doesn't depend on a drug-specific fact does not need a citation.
+
+Write the Care Plan with exactly these four sections, each with a clear heading:
+1. Problem List
+2. Goals
+3. Pharmacist Interventions
+4. Monitoring Plan
