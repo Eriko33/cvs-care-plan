@@ -2,3 +2,5 @@ Django>=5.0,<6.0
 psycopg2-binary
 anthropic
 PyYAML
+requests
+lxml

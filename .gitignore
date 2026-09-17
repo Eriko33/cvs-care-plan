@@ -27,3 +27,6 @@ venv/
 
 # Logs
 *.log
+
+# Downloaded drug labels (fetched on demand via rag/fetch_label.py)
+backend/rag/labels/
