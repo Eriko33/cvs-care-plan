@@ -1,36 +1,17 @@
 import anthropic
 from django.conf import settings
 
-PROMPT_TEMPLATE = """You are a clinical pharmacist. Write a Care Plan for the following prescription order.
+from prompts import PromptManager
 
-Patient name: {patient_name}
-Patient DOB: {patient_dob}
-Patient MRN: {mrn}
-Weight: {weight}
-Allergies: {allergies}
-Primary Diagnosis: {primary_diagnosis}
-Medication: {drug_name}
-Home meds: {home_meds}
-Prescriber: {provider_name}
-Prescriber NPI: {npi}
-
-Patient Records:
-{patient_records}
-
-Write the Care Plan with exactly these four sections, each with a clear heading:
-1. Problem List
-2. Goals
-3. Pharmacist Interventions
-4. Monitoring Plan
-"""
+prompt_manager = PromptManager()
 
 
-def generate_care_plan(data: dict) -> str:
+def generate_care_plan(data: dict) -> tuple[str, str]:
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    prompt = PROMPT_TEMPLATE.format(**data)
+    rendered = prompt_manager.render("care_plan", **data)
     message = client.messages.create(
         model=settings.ANTHROPIC_MODEL,
-        max_tokens=1500,
-        messages=[{"role": "user", "content": prompt}],
+        max_tokens=3000,
+        messages=[{"role": "user", "content": rendered.text}],
     )
-    return message.content[0].text
+    return message.content[0].text, rendered.version

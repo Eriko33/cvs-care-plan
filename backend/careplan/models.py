@@ -14,6 +14,7 @@ class CarePlan(models.Model):
     provider_name = models.CharField(max_length=255)
     npi = models.CharField(max_length=50)
     content = models.TextField()
+    prompt_version = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
