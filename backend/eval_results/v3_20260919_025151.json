@@ -1,0 +1,187 @@
+[
+  {
+    "case_name": "simple_mg_ivig",
+    "prompt_version": "v3",
+    "format": {
+      "sections_found": {
+        "Problem List": true,
+        "Goals": true,
+        "Pharmacist Interventions": true,
+        "Monitoring Plan": true
+      },
+      "all_sections_present": true,
+      "truncated": false,
+      "complete": true,
+      "numbering_issues": []
+    },
+    "dose_math": {
+      "expected_total_g": 144.0,
+      "stated_g_values_found": [
+        0.1,
+        0.4,
+        2.0,
+        8.0,
+        8.5,
+        10.0,
+        11.5,
+        28.8,
+        32.3,
+        40.0,
+        144.0
+      ],
+      "match_found": true
+    },
+    "keyword_coverage": {
+      "hits": {
+        "IgA": true,
+        "contraindicat": true,
+        "FVC": true,
+        "monitor": true
+      },
+      "coverage_ratio": 1.0
+    },
+    "tokens": {
+      "input": 1621,
+      "output": 5387,
+      "max_tokens": 8000
+    },
+    "duration_ms": 51379,
+    "stop_reason": "end_turn",
+    "care_plan_id": null
+  },
+  {
+    "case_name": "medium_mg_mild_ckd_nsaid_interaction",
+    "prompt_version": "v3",
+    "format": {
+      "sections_found": {
+        "Problem List": true,
+        "Goals": true,
+        "Pharmacist Interventions": true,
+        "Monitoring Plan": true
+      },
+      "all_sections_present": true,
+      "truncated": false,
+      "complete": true,
+      "numbering_issues": []
+    },
+    "dose_math": {
+      "expected_total_g": 120.0,
+      "stated_g_values_found": [
+        0.4,
+        2.0,
+        11.0,
+        40.0,
+        120.0
+      ],
+      "match_found": true
+    },
+    "keyword_coverage": {
+      "hits": {
+        "ibuprofen": true,
+        "NSAID": false,
+        "renal": true,
+        "contraindicat": true
+      },
+      "coverage_ratio": 0.75
+    },
+    "tokens": {
+      "input": 1741,
+      "output": 4868,
+      "max_tokens": 8000
+    },
+    "duration_ms": 42342,
+    "stop_reason": "end_turn",
+    "care_plan_id": null
+  },
+  {
+    "case_name": "complex_5dx_8meds_interactions",
+    "prompt_version": "v3",
+    "format": {
+      "sections_found": {
+        "Problem List": true,
+        "Goals": true,
+        "Pharmacist Interventions": true,
+        "Monitoring Plan": true
+      },
+      "all_sections_present": true,
+      "truncated": false,
+      "complete": true,
+      "numbering_issues": []
+    },
+    "dose_math": {
+      "expected_total_g": 136.0,
+      "stated_g_values_found": [
+        0.1,
+        0.4,
+        2.0,
+        27.2,
+        136.0
+      ],
+      "match_found": true
+    },
+    "keyword_coverage": {
+      "hits": {
+        "metformin": false,
+        "thrombo": true,
+        "warfarin": true,
+        "amiodarone": true,
+        "hyperkalemia": true,
+        "IgA": true
+      },
+      "coverage_ratio": 0.8333333333333334
+    },
+    "tokens": {
+      "input": 1851,
+      "output": 6250,
+      "max_tokens": 12000
+    },
+    "duration_ms": 57565,
+    "stop_reason": "end_turn",
+    "care_plan_id": null
+  },
+  {
+    "case_name": "edge_documented_prior_anaphylaxis",
+    "prompt_version": "v3",
+    "format": {
+      "sections_found": {
+        "Problem List": true,
+        "Goals": true,
+        "Pharmacist Interventions": true,
+        "Monitoring Plan": true
+      },
+      "all_sections_present": true,
+      "truncated": false,
+      "complete": true,
+      "numbering_issues": []
+    },
+    "dose_math": {
+      "expected_total_g": 160.0,
+      "stated_g_values_found": [
+        0.4,
+        2.0,
+        8.0,
+        8.5,
+        11.5,
+        160.0
+      ],
+      "match_found": true
+    },
+    "keyword_coverage": {
+      "hits": {
+        "anaphyla": true,
+        "contraindicat": true,
+        "hold": true,
+        "do not": true
+      },
+      "coverage_ratio": 1.0
+    },
+    "tokens": {
+      "input": 1522,
+      "output": 3853,
+      "max_tokens": 8000
+    },
+    "duration_ms": 39588,
+    "stop_reason": "end_turn",
+    "care_plan_id": null
+  }
+]

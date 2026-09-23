@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LLM Cost Dashboard</title>
+<style>
+  body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { margin-bottom: 4px; }
+  .subtitle { color: #666; margin-top: 0; }
+  .status { font-size: 13px; color: #888; display: flex; align-items: center; gap: 10px; }
+  #refresh-btn { font-size: 13px; padding: 4px 12px; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; }
+  #refresh-btn:hover { background: #f0f0f0; }
+  #refresh-btn:disabled { opacity: 0.6; cursor: default; }
+  .flash { color: #2e7d32; font-weight: bold; }
+  .cards { display: flex; gap: 16px; flex-wrap: wrap; margin: 24px 0; }
+  .card { flex: 1; min-width: 160px; background: #f5f5f5; border-radius: 8px; padding: 16px; }
+  .card .label { font-size: 13px; color: #666; margin-bottom: 4px; }
+  .card .value { font-size: 26px; font-weight: bold; }
+  .warning { background: #fff3cd; border: 1px solid #ffe69c; padding: 10px 14px; border-radius: 6px; margin: 16px 0; }
+  #chart { margin-top: 32px; }
+  .bar-label { font-size: 12px; fill: #333; }
+  .bar-value { font-size: 11px; fill: #666; }
+</style>
+</head>
+<body>
+  <h1>LLM Cost Dashboard</h1>
+  <p class="subtitle">{{ summary.start_date|default:"all time" }} &ndash; {{ summary.end_date|default:"present" }}</p>
+  <p class="status">
+    <button id="refresh-btn" onclick="refresh()">Refresh</button>
+    <span>last updated <span id="last-updated">just now</span></span>
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Total Calls</div>
+      <div class="value" id="stat-calls">{{ summary.total_calls }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Input Tokens</div>
+      <div class="value" id="stat-input">{{ summary.total_input_tokens }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Output Tokens</div>
+      <div class="value" id="stat-output">{{ summary.total_output_tokens }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Estimated Cost</div>
+      <div class="value" id="stat-cost">${{ summary.estimated_cost_usd }}</div>
+    </div>
+  </div>
+
+  <div id="warning-box"></div>
+
+  <h2>Daily Trend</h2>
+  <div id="chart"></div>
+
+  <script id="initial-summary" type="application/json">{{ summary_json|safe }}</script>
+  <script>
+    const queryString = window.location.search; // preserves ?start_date=...&end_date=... if present
+
+    function renderDashboard(summary) {
+      document.getElementById('stat-calls').textContent = summary.total_calls;
+      document.getElementById('stat-input').textContent = summary.total_input_tokens;
+      document.getElementById('stat-output').textContent = summary.total_output_tokens;
+      document.getElementById('stat-cost').textContent = '$' + summary.estimated_cost_usd;
+
+      const warningBox = document.getElementById('warning-box');
+      warningBox.innerHTML = summary.unpriced_models.length
+        ? `<div class="warning">No price configured for: ${summary.unpriced_models.join(', ')} — ` +
+          `these calls are excluded from the cost total. Add them to <code>careplan/pricing.yaml</code>.</div>`
+        : '';
+
+      const chartEl = document.getElementById('chart');
+      const daily = summary.daily_trend;
+      if (daily.length === 0) {
+        chartEl.textContent = 'No calls in this date range.';
+        return;
+      }
+      const width = 860, height = 240, padding = 40, barGap = 12;
+      const barWidth = Math.max(20, (width - padding * 2) / daily.length - barGap);
+      const maxCost = Math.max(...daily.map(d => d.estimated_cost_usd), 0.0001);
+
+      const topPadding = 24; // room for the value label above the tallest bar
+      const plotHeight = height - topPadding;
+
+      let svg = `<svg viewBox="0 0 ${width} ${height + 40}" width="100%" style="max-width:${width}px">`;
+      daily.forEach((d, i) => {
+        const barHeight = (d.estimated_cost_usd / maxCost) * plotHeight;
+        const x = padding + i * (barWidth + barGap);
+        const y = topPadding + (plotHeight - barHeight);
+        svg += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="#4a7dfc" rx="3"></rect>`;
+        svg += `<text class="bar-value" x="${x + barWidth / 2}" y="${y - 6}" text-anchor="middle">$${d.estimated_cost_usd.toFixed(2)}</text>`;
+        svg += `<text class="bar-label" x="${x + barWidth / 2}" y="${height + 16}" text-anchor="middle">${d.date.slice(5)}</text>`;
+        svg += `<text class="bar-label" x="${x + barWidth / 2}" y="${height + 32}" text-anchor="middle" fill="#999">${d.calls} calls</text>`;
+      });
+      svg += `</svg>`;
+      chartEl.innerHTML = svg;
+    }
+
+    async function refresh() {
+      const btn = document.getElementById('refresh-btn');
+      const lastUpdated = document.getElementById('last-updated');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing...';
+      try {
+        const resp = await fetch('/api/llm-costs' + queryString);
+        const summary = await resp.json();
+        renderDashboard(summary);
+        lastUpdated.innerHTML = `${new Date().toLocaleTimeString()} <span class="flash">&check; refreshed</span>`;
+        setTimeout(() => { lastUpdated.textContent = new Date().toLocaleTimeString(); }, 2000);
+      } catch (e) {
+        lastUpdated.textContent = 'refresh failed — try again';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+      }
+    }
+
+    renderDashboard(JSON.parse(document.getElementById('initial-summary').textContent));
+  </script>
+</body>
+</html>
