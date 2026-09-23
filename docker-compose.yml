@@ -23,6 +23,9 @@ services:
       POSTGRES_PORT: 5432
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      LANGSMITH_TRACING_V2: ${LANGSMITH_TRACING_V2:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-care-plan-system}
     depends_on:
       - db
 
