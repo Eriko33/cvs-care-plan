@@ -1,19 +1,26 @@
-"""Autonomous prompt-tuning agent, built on claude-agent-sdk.
+"""Claude Agent SDK script, now wired to the Day-8 MCP server
+(careplan/mcp_server.py) instead of raw filesystem/Bash tools.
 
-Task: run eval.py, find the 3 worst-F1 patients, look at their mis-scored
-items, edit only the prompt's "口径" (tone/criteria) section, save as v6,
-point config.yaml at v6, rerun eval, report the before/after numbers.
+Task: generate a care plan for MRN 002345 and save it — but print the draft
+and wait for the pharmacist's confirmation BEFORE saving. On rejection, the
+pharmacist's feedback goes back to the model so it can redraft.
 
-Restricted to PROJECT_DIR (belt-and-suspenders: cwd + a path check inside
-the permission callback, not just cwd alone). Every Bash command needs an
-interactive y/n confirmation before it runs; Read/Write/Edit are auto-allowed
-but only when the target path resolves inside PROJECT_DIR.
+IMPORTANT — verified vs. not verified (see conversation for details):
+  - mcp_servers config shape, tool naming convention, PermissionResultDeny's
+    `message` feeding back into the same turn: all confirmed against the
+    installed claude-agent-sdk's real type signatures.
+  - draft_care_plan/save_care_plan (the two new MCP tools this depends on):
+    tested directly against real DB data — draft does NOT save, save does.
+  - The full SDK <-> MCP server live run (query() actually talking to this
+    MCP server, discovering its tools): NOT run end-to-end here — this
+    container doesn't have the `claude` CLI binary the SDK shells out to.
+    Everything below is correct per the verified API shapes, but hasn't
+    been watched running as one live process.
 
-Run:
+Run (needs the `claude` CLI installed, not just the Python package):
     python prompt_tuning_agent.py
 """
 import asyncio
-from pathlib import Path
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -28,42 +35,47 @@ from claude_agent_sdk import (
     query,
 )
 
-PROJECT_DIR = Path("/path/to/your/eval/project").resolve()  # <- set this
+# MCP server name — becomes the middle segment of every tool name:
+# mcp__care-plan-system__draft_care_plan, mcp__care-plan-system__save_care_plan, etc.
+MCP_SERVER_NAME = "care-plan-system"
 
-TASK = """
-跑一遍 eval.py，找出 F1 最低的三个病人，看判错条目。
-只改 prompts/careplan_generation/v5.txt 里"口径"相关的部分（比如判定标准、措辞要求），
-不要动整体结构、字数要求之外的其他内容。
-把改完的版本存成 prompts/careplan_generation/v6.txt（v5.txt 保持不动，方便对比）。
-把 config.yaml 里指向 prompt 版本的字段改成 v6。
-再跑一遍 eval.py。
-最后报告这三个病人改动前后各自的 precision / recall / F1，一共六组数字的对比。
+MRN = "002345"
+
+TASK = f"""
+给 MRN {MRN} 生成一份 care plan。
+先用 draft_care_plan 生成草稿，不要直接存库。
+把草稿完整内容展示出来。
+确认通过后，再用 save_care_plan 把这份内容存进系统。
+如果草稿被拒绝并给了修改意见，根据意见重新生成一份草稿，再次展示等待确认，
+直到确认通过为止。
 """
 
 
-def _path_inside_project(raw_path: str) -> bool:
-    try:
-        resolved = (PROJECT_DIR / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
-    except Exception:
-        return False
-    return resolved == PROJECT_DIR or PROJECT_DIR in resolved.parents
+def mcp_tool_name(name: str) -> str:
+    return f"mcp__{MCP_SERVER_NAME}__{name}"
 
 
 async def confirm_tool(tool_name: str, tool_input: dict, context) -> "PermissionResultAllow | PermissionResultDeny":
-    if tool_name == "Bash":
-        command = tool_input.get("command", "")
-        answer = await asyncio.to_thread(input, f"\n[需要确认] 即将执行命令:\n  {command}\n允许吗？(y/n) ")
+    if tool_name == mcp_tool_name("save_care_plan"):
+        print("\n" + "=" * 60)
+        print("即将保存的 care plan 草稿：")
+        print("=" * 60)
+        print(tool_input.get("content", "(no content field found)"))
+        print("=" * 60)
+
+        answer = await asyncio.to_thread(input, "\n确认保存吗？(y/n) ")
         if answer.strip().lower() == "y":
             return PermissionResultAllow()
-        return PermissionResultDeny(message="用户拒绝执行这条命令", interrupt=False)
 
-    if tool_name in ("Write", "Edit"):
-        file_path = tool_input.get("file_path", "")
-        if not _path_inside_project(file_path):
-            return PermissionResultDeny(message=f"{file_path} 不在项目目录 {PROJECT_DIR} 内，拒绝写入")
-        return PermissionResultAllow()
+        feedback = await asyncio.to_thread(input, "拒绝了 —— 说说要改哪里: ")
+        # message 会作为这次工具调用失败的原因回传给模型，同一轮对话里模型能看到、
+        # 可以据此重新调用 draft_care_plan 生成新草稿 —— 不需要开新的 session。
+        return PermissionResultDeny(
+            message=f"药剂师拒绝保存，意见：{feedback}。请根据这个意见重新生成草稿，不要直接重试保存。",
+            interrupt=False,
+        )
 
-    # Read / Glob / Grep：只读，风险低，直接放行（cwd 已经把默认查找范围限定在项目目录）
+    # draft_care_plan / read_care_plan / query_labs：只读或者只是生成草稿，不落库，直接放行
     return PermissionResultAllow()
 
 
@@ -80,10 +92,24 @@ def _print_content_block(block, prefix: str = ""):
 
 async def main():
     options = ClaudeAgentOptions(
-        cwd=str(PROJECT_DIR),
-        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+        # stdio 方式接入 mcp_server.py —— 直接跑 python -m，因为这个脚本本来就假定
+        # 在同一个装好 Django/Postgres 依赖的容器环境里运行。从容器外接的话，
+        # 换成 command="docker", args=["compose", "exec", "-T", "web", "python", "-m", "careplan.mcp_server"]。
+        mcp_servers={
+            MCP_SERVER_NAME: {
+                "type": "stdio",
+                "command": "python",
+                "args": ["-m", "careplan.mcp_server"],
+            },
+        },
+        allowed_tools=[
+            mcp_tool_name("draft_care_plan"),
+            mcp_tool_name("save_care_plan"),
+            mcp_tool_name("read_care_plan"),
+            mcp_tool_name("query_labs"),
+        ],
         can_use_tool=confirm_tool,
-        max_turns=30,
+        max_turns=15,
     )
 
     async for message in query(prompt=TASK, options=options):
@@ -91,7 +117,6 @@ async def main():
             for block in message.content:
                 _print_content_block(block)
         elif isinstance(message, UserMessage):
-            # tool_result 块实际是在 UserMessage 里回传的，不是 AssistantMessage
             if isinstance(message.content, list):
                 for block in message.content:
                     _print_content_block(block, prefix="  ")

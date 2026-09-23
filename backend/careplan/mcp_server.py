@@ -83,6 +83,78 @@ def generate_care_plan_tool(mrn: str) -> str:
     return f"Generated new care plan (id={new_plan.id}, prompt_version={result.prompt_version}) for MRN {mrn}:\n\n{new_plan.content}"
 
 
+@mcp.tool(name="draft_care_plan")
+def draft_care_plan_tool(mrn: str) -> str:
+    """Generate a DRAFT care plan for review — does NOT save it. By MRN.
+
+    WHEN TO CALL: this is the first step of the generate-then-confirm flow.
+    Use this (not generate_care_plan) whenever a human needs to review the
+    content before it's persisted. The draft text comes back in the tool
+    result, along with the prompt_version used — pass BOTH of those to
+    save_care_plan once approved. Costs a real LLM call, same as
+    generate_care_plan.
+    """
+    existing = _latest_care_plan_for_mrn(mrn)
+    if existing is None:
+        return (
+            f"No prior care plan found for MRN {mrn}. This tool can only draft for a "
+            f"patient already on file — enter them through the web form first."
+        )
+
+    data = {
+        "patient_name": existing.patient_name,
+        "patient_dob": existing.patient_dob,
+        "mrn": existing.mrn,
+        "weight": existing.weight,
+        "allergies": existing.allergies,
+        "primary_diagnosis": existing.primary_diagnosis,
+        "drug_name": existing.drug_name,
+        "home_meds": existing.home_meds,
+        "patient_records": existing.patient_records,
+        "provider_name": existing.provider_name,
+        "npi": existing.npi,
+    }
+    result = _generate_care_plan(data)
+    return (
+        f"DRAFT (not yet saved) for MRN {mrn}, prompt_version={result.prompt_version}:\n\n"
+        f"{result.text}"
+    )
+
+
+@mcp.tool(name="save_care_plan")
+def save_care_plan_tool(mrn: str, content: str, prompt_version: str) -> str:
+    """Persist an already-drafted care plan to the database. By MRN.
+
+    WHEN TO CALL: only after a human has reviewed and approved a draft from
+    draft_care_plan. Pass the exact `content` and `prompt_version` the draft
+    came back with — this tool does not regenerate anything, it just saves
+    what you give it. Reuses the same demographics/diagnosis/meds already on
+    file for this MRN (same limitation as draft_care_plan: MRN must already
+    exist).
+    """
+    existing = _latest_care_plan_for_mrn(mrn)
+    if existing is None:
+        return f"No prior care plan found for MRN {mrn}. Cannot save — patient not on file."
+
+    new_plan = CarePlan.objects.create(
+        content=content,
+        prompt_version=prompt_version,
+        reference_material="",  # not re-derived here; draft_care_plan's result already had it in context
+        patient_name=existing.patient_name,
+        patient_dob=existing.patient_dob,
+        mrn=existing.mrn,
+        weight=existing.weight,
+        allergies=existing.allergies,
+        primary_diagnosis=existing.primary_diagnosis,
+        drug_name=existing.drug_name,
+        home_meds=existing.home_meds,
+        patient_records=existing.patient_records,
+        provider_name=existing.provider_name,
+        npi=existing.npi,
+    )
+    return f"Saved care plan id={new_plan.id} for MRN {mrn} (prompt_version={prompt_version})."
+
+
 @mcp.tool(name="read_care_plan")
 def read_care_plan_tool(mrn: str) -> str:
     """Read the most recently generated care plan for a patient, by MRN.
