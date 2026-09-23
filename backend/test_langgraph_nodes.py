@@ -56,11 +56,15 @@ TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 model_with_tools = ChatAnthropic(model="claude-sonnet-5").bind_tools(TOOLS)
 
 
+MAX_ROUNDS = 8
+
+
 class CarePlanAgentState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     round_number: int
     mrn: str
     final_care_plan: Optional[str]
+    stop_reason: Optional[str]  # "done" or "hit MAX_ROUNDS=..." — set by finalize_node
 
 
 def call_model_node(state: CarePlanAgentState) -> dict:
@@ -99,11 +103,29 @@ def run_tools_node(state: CarePlanAgentState) -> dict:
 
 
 def should_continue(state: CarePlanAgentState) -> str:
-    return "tools" if state["messages"][-1].tool_calls else "finalize"
+    """条件函数只能决定路由去哪个 node，不能直接写 state —— 所以"轮数到8记一笔"
+    这个动作实际发生在下面 finalize_node 里，这里只负责判断该不该去那儿。"""
+    if state["round_number"] >= MAX_ROUNDS:
+        return "finalize"  # 轮数到了，不管 AI 还想不想继续调用，都去 finalize
+    if state["messages"][-1].tool_calls:
+        return "tools"
+    return "finalize"  # AI 给出了最终回答，没有新的函数调用请求
 
 
 def finalize_node(state: CarePlanAgentState) -> dict:
-    return {"final_care_plan": state["messages"][-1].text}
+    """真正"记一笔"的地方：区分是正常结束，还是撞到轮数上限被迫结束。"""
+    last_message = state["messages"][-1]
+    hit_round_limit = state["round_number"] >= MAX_ROUNDS and bool(last_message.tool_calls)
+
+    if hit_round_limit:
+        return {
+            "final_care_plan": last_message.text or "(no final answer — stopped mid tool-call round)",
+            "stop_reason": f"hit MAX_ROUNDS={MAX_ROUNDS} while the model still wanted to call tools",
+        }
+    return {
+        "final_care_plan": last_message.text,
+        "stop_reason": "done",
+    }
 
 
 def build_graph():
@@ -113,7 +135,7 @@ def build_graph():
     graph.add_node("finalize", finalize_node)
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", should_continue, {"tools": "tools", "finalize": "finalize"})
-    graph.add_edge("tools", "agent")
+    graph.add_edge("tools", "agent")  # "跑函数"做完固定回到"调模型"
     graph.add_edge("finalize", END)
     return graph.compile()
 
@@ -131,13 +153,23 @@ def test_full_run():
             "round_number": 0,
             "mrn": "005678",
             "final_care_plan": None,
+            "stop_reason": None,
         },
         config={"recursion_limit": 20},
     )
     print("round_number:", result["round_number"])
     print("mrn:", result["mrn"])
     print("message count:", len(result["messages"]))
+    print("stop_reason:", result["stop_reason"])
     print("final_care_plan:", result["final_care_plan"])
+
+
+def save_graph_png(path: str = "graph.png"):
+    app = build_graph()
+    png_bytes = app.get_graph().draw_mermaid_png()
+    with open(path, "wb") as f:
+        f.write(png_bytes)
+    print(f"saved graph diagram to {path} ({len(png_bytes)} bytes)")
 
 
 def test_run_tools_node_error_handling():
@@ -157,12 +189,33 @@ def test_run_tools_node_error_handling():
         "round_number": 1,
         "mrn": "005678",
         "final_care_plan": None,
+        "stop_reason": None,
     }
     update = run_tools_node(state)
     for msg in update["messages"]:
         print(f"  [{msg.name}] status={msg.status} | content={str(msg.content)[:120]}")
 
 
+def test_max_round_cutoff():
+    print()
+    print("=" * 20, "should_continue + finalize_node at round_number == MAX_ROUNDS", "=" * 20)
+    fake_ai_message = AIMessage(
+        content="still working on it",
+        tool_calls=[{"name": "search_reference_material", "args": {"query": "x"}, "id": "call_1"}],
+    )
+    state: CarePlanAgentState = {
+        "messages": [fake_ai_message],
+        "round_number": MAX_ROUNDS,
+        "mrn": "005678",
+        "final_care_plan": None,
+        "stop_reason": None,
+    }
+    print("should_continue ->", should_continue(state))
+    print("finalize_node ->", finalize_node(state))
+
+
 if __name__ == "__main__":
     test_full_run()
     test_run_tools_node_error_handling()
+    test_max_round_cutoff()
+    save_graph_png()
