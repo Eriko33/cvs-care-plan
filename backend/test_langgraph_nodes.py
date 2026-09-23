@@ -140,7 +140,7 @@ def build_graph():
     return graph.compile()
 
 
-def test_full_run():
+def demo_full_run():
     print("=" * 20, "full graph run", "=" * 20)
     app = build_graph()
     result = app.invoke(
@@ -172,7 +172,7 @@ def save_graph_png(path: str = "graph.png"):
     print(f"saved graph diagram to {path} ({len(png_bytes)} bytes)")
 
 
-def test_run_tools_node_error_handling():
+def demo_run_tools_node_error_handling():
     print()
     print("=" * 20, "run_tools_node error handling (one bad call, one good call)", "=" * 20)
     # Bypass the real model here — build the AIMessage by hand so the test is
@@ -196,7 +196,7 @@ def test_run_tools_node_error_handling():
         print(f"  [{msg.name}] status={msg.status} | content={str(msg.content)[:120]}")
 
 
-def test_max_round_cutoff():
+def demo_max_round_cutoff():
     print()
     print("=" * 20, "should_continue + finalize_node at round_number == MAX_ROUNDS", "=" * 20)
     fake_ai_message = AIMessage(
@@ -215,7 +215,7 @@ def test_max_round_cutoff():
 
 
 if __name__ == "__main__":
-    test_full_run()
-    test_run_tools_node_error_handling()
-    test_max_round_cutoff()
+    demo_full_run()
+    demo_run_tools_node_error_handling()
+    demo_max_round_cutoff()
     save_graph_png()
