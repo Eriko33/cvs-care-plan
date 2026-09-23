@@ -16,6 +16,7 @@ django.setup()
 from langchain_anthropic import ChatAnthropic  # noqa: E402
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage  # noqa: E402
 from langchain_core.tools import tool  # noqa: E402
+from langgraph.config import get_stream_writer  # noqa: E402
 from langgraph.graph import END, START, StateGraph  # noqa: E402
 from langgraph.graph.message import add_messages  # noqa: E402
 
@@ -83,21 +84,30 @@ def run_tools_node(state: CarePlanAgentState) -> dict:
     all, and append every result to history together. A function raising an
     exception does NOT crash this node — the error message becomes that
     call's result instead, marked with status="error" so the model (and any
-    code inspecting the state) can tell it apart from a real result."""
+    code inspecting the state) can tell it apart from a real result.
+
+    Also emits "custom" stream events (tool_start/tool_done) so a frontend
+    watching stream_mode="custom" can show "正在查化验…" style progress —
+    get_stream_writer() is a no-op when nobody's listening on that mode, so
+    this is safe to call even outside a streamed run."""
+    writer = get_stream_writer()
     last_message = state["messages"][-1]
     tool_messages = []
 
     for call in last_message.tool_calls:
+        writer({"type": "tool_start", "tool": call["name"], "args": call["args"]})
         try:
             output = TOOLS_BY_NAME[call["name"]].invoke(call["args"])
             tool_messages.append(
                 ToolMessage(content=str(output), tool_call_id=call["id"], name=call["name"], status="success")
             )
+            writer({"type": "tool_done", "tool": call["name"], "status": "success"})
         except Exception as exc:
             error_text = f"{type(exc).__name__}: {exc}"
             tool_messages.append(
                 ToolMessage(content=error_text, tool_call_id=call["id"], name=call["name"], status="error")
             )
+            writer({"type": "tool_done", "tool": call["name"], "status": "error"})
 
     return {"messages": tool_messages}
 
