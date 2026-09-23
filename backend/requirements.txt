@@ -10,3 +10,4 @@ mcp
 langchain
 langchain-anthropic
 pytest
+claude-agent-sdk
